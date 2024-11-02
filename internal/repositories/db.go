@@ -411,7 +411,7 @@ func DBShowItems() ([]models.Item, error) {
 
 // DBShowAvailableItems
 /*
-Devuelve una lista con los items que no se encuentran en prestamos activos 
+Devuelve una lista con los items que no se encuentran en prestamos activos
 en la base de datos en formato JSON.
 */
 func DBShowAvailableItems() ([]models.Item, error) {
@@ -451,7 +451,7 @@ func DBShowAvailableItems() ([]models.Item, error) {
 
 // DBShowAvailableItemsByItemTypeID
 /*
-Devuelve una lista con los items que no se encuentran en prestamos activos 
+Devuelve una lista con los items que no se encuentran en prestamos activos
 y que pertenecen a un tipo de item en la base de datos en formato JSON.
 */
 func DBShowAvailableItemsByItemTypeID(itemTypeID int) ([]models.Item, error) {
@@ -468,7 +468,8 @@ func DBShowAvailableItemsByItemTypeID(itemTypeID int) ([]models.Item, error) {
 				join typeitem t on i.id = t.id
 				join loanitem l on i.id = l.itemid
 				join loan l2 on l.loanid = l2.id
-				where l2.status <> 'Active' and i.typeid = $1;`
+				where l2.status <> 'Active' and i.typeid = $1
+				limit 1;`
 
 	rows, err := db.Query(query, itemTypeID)
 	if err != nil {
@@ -762,7 +763,7 @@ func DBGetLoanByID(id int) (models.Loan, error) {
 /*
 Guarda un prestamo en la base de datos. Devuelve un error si hay un error en la base de datos.
 */
-func DBSaveLoan(loan models.Loan) (int64,error) {
+func DBSaveLoan(loan models.Loan) (int64, error) {
 	db := connect(false)
 	// Cerrar la conexion a la base de datos
 	defer func(db *sql.DB) {

@@ -62,9 +62,31 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var tokenString string
+	tokenString, err = CreateSessionToken(user, 240)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	// Enviar el token en la respuesta
+	err = json.NewEncoder(w).Encode(map[string]string{"tokenJWT": tokenString})
+	if err != nil {
+		http.Error(w, "No se puedo enviar el Token", http.StatusInternalServerError)
+		return
+	}
+
+}
+
+// CreateSessionToken
+/*
+Crea un token de sesion para el usuario recibido
+*/
+func CreateSessionToken(user models.User, sessionTime int) (string, error) {
 	if !user.IsEmpty() {
 		// Genera un token JWT
-		expirationTime := time.Now().Add(30 * time.Minute)
+		expirationTime := time.Now().Add(time.Duration(sessionTime) * time.Minute)
 		claims := &models.Claims{
 			Username: user.Name,
 			Role:     user.Role,
@@ -75,33 +97,25 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 
 		// utilizar llave secreta para firmar el token
 		var secretKey []byte
-		secretKey, err = base64.StdEncoding.DecodeString(os.Getenv("JWT_SECRET"))
+		secretKey, err := base64.StdEncoding.DecodeString(os.Getenv("JWT_SECRET"))
 		if err != nil {
-			http.Error(w, "No se pudo decodificar la llave secreta", http.StatusInternalServerError)
-			return
+			return "", err
 		}
 		key := string(secretKey)
 		if key == "" {
-			http.Error(w, "No se ha definido una llave secreta", http.StatusInternalServerError)
-			return
+			return "", errors.New("la llave secreta está vacía")
 		}
 
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 		tokenString, err := token.SignedString([]byte(key))
 		if err != nil {
-			http.Error(w, "No se pudo generar el token", http.StatusInternalServerError)
-			return
+			return "", errors.New("No se pudo generar el token")
 		}
 
-		// Enviar el token en la respuesta
-		err = json.NewEncoder(w).Encode(map[string]string{"tokenJWT": tokenString})
-		if err != nil {
-			http.Error(w, "No se puedo enviar el Token", http.StatusInternalServerError)
-			return
-		}
-
+		return tokenString, nil
 	}
 
+	return "", errors.New("El usuario no puede estar vacío")
 }
 
 // LoginGoogle
@@ -136,14 +150,45 @@ func LoginGoogle(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// If the user does not exist, send a message to the client to register the user and send the mail
-		if user.IsEmpty() {
-			err = json.NewEncoder(w).Encode(map[string]string{"message": "User does not exist", "email": googleUser.Email})
-			if err != nil {
-				http.Error(w, "Error de servidor", http.StatusInternalServerError)
+		var tokenString string
+		// Si el usuario no existe, lo creo
+		if !(user.IsEmpty()) {
+			newUser := models.User{
+				Name:       googleUser.Email,
+				IsVerified: false,
 			}
-		} else {
-			print("User exists\n")
+
+			err = repositories.DBSaveUser(newUser)
+			if err != nil {
+				http.Error(w, "Error guardando el usuario", http.StatusInternalServerError)
+				return
+			}
+
+			if err != nil {
+				http.Error(w, "Error creando el usuario", http.StatusInternalServerError)
+				return
+			}
+
+			tokenString, err = CreateSessionToken(newUser, 240)
+
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusUnauthorized)
+				return
+			}
+
+			// Envio el token del nuevo usuario
+			err = json.NewEncoder(w).Encode(map[string]string{"tokenJWT": tokenString})
+			if err != nil {
+				http.Error(w, "No se puedo enviar el Token", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		// Si existe, envio el token
+		err = json.NewEncoder(w).Encode(map[string]string{"tokenJWT": tokenString})
+		if err != nil {
+			http.Error(w, "No se puedo enviar el Token", http.StatusInternalServerError)
+			return
 		}
 	})
 
