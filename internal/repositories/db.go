@@ -495,7 +495,7 @@ func DBShowAvailableItemsByItemTypeID(itemTypeID int) ([]models.Item, error) {
 Devuelve una lista con los items que no se encuentran en prestamos activos
 y que pertenecen a un tipo de item "itemType" en la base de datos en formato JSON.
 */
-func DBShowAvailableItemsByItemType(itemType string) ([]models.Item, error) {
+func DBShowAvailableItemsByItemType(itemType int) ([]models.Item, error) {
 	var items []models.Item
 
 	db := connect(false)
@@ -509,7 +509,7 @@ func DBShowAvailableItemsByItemType(itemType string) ([]models.Item, error) {
 				join typeitem t on i.id = t.id
 				join loanitem l on i.id = l.itemid
 				join loan l2 on l.loanid = l2.id
-				where l2.status <> 'Active' and t."name" = $1
+				where l2.status <> 'Active' and i.typeid = $1
 				limit 1;`
 
 	rows, err := db.Query(query, itemType)

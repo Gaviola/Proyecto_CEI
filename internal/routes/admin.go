@@ -605,38 +605,38 @@ verifica que los campos sean correctos
 y los guarda en la base de datos
 */
 func CreateLoan(w http.ResponseWriter, r *http.Request) {
-	var loan models.Loan
-
-	err := json.NewDecoder(r.Body).Decode(&loan)
-
-	if err != nil {
-		http.Error(w, "Invalid loan data", http.StatusBadRequest)
-		fmt.Println(err)
-		return
-	}
-
-	// Deserializar el JSON para obtener el campo adicional itemType
-	var data map[string]interface{}
+	// Lee todo el json recibido
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Error al leer el cuerpo de la solicitud:", http.StatusBadRequest)
 		return
 	}
+
+	// Decodifico el json en una variable de tipo Loan
+	var loan models.Loan
+	if err := json.Unmarshal(bodyBytes, &loan); err != nil {
+		http.Error(w, "Invalid loan data", http.StatusBadRequest)
+		fmt.Println(err)
+		return
+	}
+
+	// Decodifico el json en un map para obtener el campo "itemType"
+	var data map[string]interface{}
 	if err := json.Unmarshal(bodyBytes, &data); err != nil {
 		http.Error(w, "Error al deserializar en map:", http.StatusBadRequest)
 		return
 	}
 
 	// Variable para guardar "itemType"
-	var itemType string
-	if it, ok := data["itemType"].(string); ok {
-		itemType = it
+	var itemType int
+	if it, ok := data["itemType"].(float64); ok { // JSON numbers are unmarshalled as float64
+		itemType = int(it)
 	} else {
-		http.Error(w, "Campo 'itemType' no encontrado o no es un string", http.StatusBadRequest)
+		http.Error(w, "Campo 'itemType' no encontrado o no es un int", http.StatusBadRequest)
 		return
 	}
 
-	//Verifico que haya al menos un item en la BD con el itemType recibido
+	// Verifico que haya al menos un item en la BD con el itemType recibido
 	availableItems, err := repositories.DBShowAvailableItemsByItemType(itemType)
 	if err != nil {
 		http.Error(w, "Error al buscar items disponibles", http.StatusInternalServerError)
