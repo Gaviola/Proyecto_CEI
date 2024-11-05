@@ -58,7 +58,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 		StudentId: newUser.StudentId,
 		Email:     newUser.Email,
 		Phone:     newUser.Phone,
-		Role:      "Estudiante",
+		Role:      "student",
 		Dni:       newUser.Dni,
 		CreatorId: newUser.CreatorId,
 		School:    newUser.School,
