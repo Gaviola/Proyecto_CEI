@@ -70,8 +70,21 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Enviar el token en la respuesta
-	err = json.NewEncoder(w).Encode(map[string]string{"tokenJWT": tokenString})
+	// Enviar el token en la respuesta junto con los datos del usuario
+	err = json.NewEncoder(w).Encode(map[string]string{
+		"tokenJWT":    tokenString,
+		"id":          strconv.Itoa(user.ID),
+		"role":        user.Role,
+		"username":    user.Name,
+		"lastname":    user.Lastname,
+		"email":       user.Email,
+		"student_id":  strconv.Itoa(user.StudentId),
+		"phone":       strconv.Itoa(user.Phone),
+		"dni":         strconv.Itoa(user.Dni),
+		"school":      user.School,
+		"is_verified": strconv.FormatBool(user.IsVerified),
+	})
+
 	if err != nil {
 		http.Error(w, "No se puedo enviar el Token", http.StatusInternalServerError)
 		return
@@ -109,13 +122,13 @@ func CreateSessionToken(user models.User, sessionTime int) (string, error) {
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 		tokenString, err := token.SignedString([]byte(key))
 		if err != nil {
-			return "", errors.New("No se pudo generar el token")
+			return "", errors.New("no se pudo generar el token")
 		}
 
 		return tokenString, nil
 	}
 
-	return "", errors.New("El usuario no puede estar vacío")
+	return "", errors.New("el usuario no puede estar vacío")
 }
 
 // LoginGoogle
@@ -177,7 +190,18 @@ func LoginGoogle(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Envio el token del nuevo usuario
-			err = json.NewEncoder(w).Encode(map[string]string{"tokenJWT": tokenString})
+			err = json.NewEncoder(w).Encode(map[string]string{
+				"tokenJWT":    tokenString,
+				"id":          strconv.Itoa(user.ID),
+				"role":        user.Role,
+				"username":    user.Name,
+				"lastname":    user.Lastname,
+				"email":       user.Email,
+				"student_id":  strconv.Itoa(user.StudentId),
+				"phone":       strconv.Itoa(user.Phone),
+				"dni":         strconv.Itoa(user.Dni),
+				"school":      user.School,
+				"is_verified": strconv.FormatBool(user.IsVerified)})
 			if err != nil {
 				http.Error(w, "No se puedo enviar el Token", http.StatusInternalServerError)
 				return

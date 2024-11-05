@@ -3,6 +3,7 @@ package routes
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/Gaviola/Proyecto_CEI_Back.git/internal/repositories"
 	"github.com/Gaviola/Proyecto_CEI_Back.git/models"
@@ -71,8 +72,27 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Creo el token JWT
+	tokenString, err := CreateSessionToken(userRegister, 240)
+	if err != nil {
+		http.Error(w, "Error creating token", http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusCreated)
-	err = json.NewEncoder(w).Encode(map[string]string{"message": "User registered, pending approval"})
+	err = json.NewEncoder(w).Encode(map[string]string{
+		"tokenJWT":    tokenString,
+		"id":          strconv.Itoa(userRegister.ID),
+		"role":        userRegister.Role,
+		"username":    userRegister.Name,
+		"lastname":    userRegister.Lastname,
+		"email":       userRegister.Email,
+		"student_id":  strconv.Itoa(userRegister.StudentId),
+		"phone":       strconv.Itoa(userRegister.Phone),
+		"dni":         strconv.Itoa(userRegister.Dni),
+		"school":      userRegister.School,
+		"is_verified": strconv.FormatBool(userRegister.IsVerified)})
+
 	if err != nil {
 		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 		return
