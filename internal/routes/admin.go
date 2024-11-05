@@ -3,6 +3,7 @@ package routes
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -45,12 +46,12 @@ func AdminRoutes(r chi.Router) {
 
 		// Rutas para ítems
 		r.Route("/items", func(r chi.Router) {
-			r.Post("/", CreateItem)           // Crear un ítem
-			r.Delete("/{itemID}", DeleteItem) // Eliminar un ítem
-			r.Patch("/{itemID}", UpdateItem)  // Actualizar un ítem
-			r.Get("/", GetItems)              // Obtener todos los ítems
-			r.Get("/{itemID}", GetItem)       // Obtener un ítem
-			r.Get("/available", GetAvailableItems) // Obtener ítems disponibles
+			r.Post("/", CreateItem)                                         // Crear un ítem
+			r.Delete("/{itemID}", DeleteItem)                               // Eliminar un ítem
+			r.Patch("/{itemID}", UpdateItem)                                // Actualizar un ítem
+			r.Get("/", GetItems)                                            // Obtener todos los ítems
+			r.Get("/{itemID}", GetItem)                                     // Obtener un ítem
+			r.Get("/available", GetAvailableItems)                          // Obtener ítems disponibles
 			r.Get("/available/{itemTypeID}", GetAvailableItemsByItemTypeID) // Obtener ítems disponibles
 		})
 
@@ -553,7 +554,7 @@ func GetItem(w http.ResponseWriter, r *http.Request) {
 Obtiene todos los items disponibles de la base de datos
 */
 func GetAvailableItems(w http.ResponseWriter, r *http.Request) {
-	
+
 	items, err := repositories.DBShowAvailableItems()
 
 	if err != nil {
@@ -573,7 +574,7 @@ func GetAvailableItems(w http.ResponseWriter, r *http.Request) {
 Obtiene todos los items disponibles de un tipo de item de la base de datos
 */
 func GetAvailableItemsByItemTypeID(w http.ResponseWriter, r *http.Request) {
-	
+
 	itemTypeID := chi.URLParam(r, "itemTypeID")
 
 	id, err := strconv.ParseInt(itemTypeID, 10, 0)
@@ -614,7 +615,40 @@ func CreateLoan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var loanID int64	
+	// Deserializar el JSON para obtener el campo adicional itemType
+	var data map[string]interface{}
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error al leer el cuerpo de la solicitud:", http.StatusBadRequest)
+		return
+	}
+	if err := json.Unmarshal(bodyBytes, &data); err != nil {
+		http.Error(w, "Error al deserializar en map:", http.StatusBadRequest)
+		return
+	}
+
+	// Variable para guardar "itemType"
+	var itemType string
+	if it, ok := data["itemType"].(string); ok {
+		itemType = it
+	} else {
+		http.Error(w, "Campo 'itemType' no encontrado o no es un string", http.StatusBadRequest)
+		return
+	}
+
+	//Verifico que haya al menos un item en la BD con el itemType recibido
+	availableItems, err := repositories.DBShowAvailableItemsByItemType(itemType)
+	if err != nil {
+		http.Error(w, "Error al buscar items disponibles", http.StatusInternalServerError)
+		return
+	}
+
+	if len(availableItems) == 0 {
+		http.Error(w, "No hay items disponibles con el tipo de item recibido", http.StatusBadRequest)
+		return
+	}
+
+	var loanID int64
 	loanID, err = repositories.DBSaveLoan(loan)
 
 	if err != nil {
@@ -627,7 +661,7 @@ func CreateLoan(w http.ResponseWriter, r *http.Request) {
 	err = json.NewEncoder(w).Encode(map[string]int64{"loanID": loanID})
 	if err != nil {
 		return
-	}	
+	}
 }
 
 // DeleteLoan
