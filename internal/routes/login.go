@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Gaviola/Proyecto_CEI_Back.git/internal/repositories"
@@ -27,11 +28,86 @@ func LoginRoutes(r chi.Router) {
 	r.Route("/login", func(r chi.Router) {
 		r.Post("/user", LoginUser)     // Login con email y contraseña
 		r.Post("/google", LoginGoogle) // Login con Google
+		r.Post("/JWT", LoginJWT)       // Login con JWT
 	})
 	r.Route("/reset-password", func(r chi.Router) {
 		r.Post("/", RequestPasswordReset) // Solicitar restablecimiento de contraseña
 		r.Post("/{token}", ResetPassword) // Restablecer contraseña
 	})
+}
+
+// LoginJWT
+/*
+LoginJWT permite a un usuario autenticarse con un token JWT.
+*/
+func LoginJWT(w http.ResponseWriter, r *http.Request) {
+	var jwtKey []byte
+	jwtKey, err := base64.StdEncoding.DecodeString(os.Getenv("JWT_SECRET"))
+	if err != nil {
+		http.Error(w, "Error al decodificar la llave secreta", http.StatusInternalServerError)
+		return
+	}
+
+	// Obtener el token del header Authorization
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		http.Error(w, "Falta el header Authorization", http.StatusUnauthorized)
+		return
+	}
+
+	// Verificar que el formato sea "Bearer <token>"
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		http.Error(w, "Formato de autorización inválido", http.StatusUnauthorized)
+		return
+	}
+
+	tokenStr := parts[1]
+
+	// Parsear y validar el token
+	claims := &models.Claims{}
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+
+	if err != nil || !token.Valid {
+		http.Error(w, "Token inválido o expirado", http.StatusUnauthorized)
+		return
+	}
+
+	//Busco al usuario en la base de datos en funcion del id dentro del token
+	userID := claims.ID
+	if err != nil {
+		http.Error(w, "ID de usuario inválido", http.StatusInternalServerError)
+		return
+	}
+
+	var user models.User
+	user, err = repositories.DBGetUserByID(userID)
+	if err != nil {
+		http.Error(w, "Error de servidor", http.StatusInternalServerError)
+		return
+	}
+
+	// Enviar el token en la respuesta junto con los datos del usuario
+	err = json.NewEncoder(w).Encode(map[string]string{
+		"id":          strconv.Itoa(user.ID),
+		"role":        user.Role,
+		"username":    user.Name,
+		"lastname":    user.Lastname,
+		"email":       user.Email,
+		"student_id":  strconv.Itoa(user.StudentId),
+		"phone":       strconv.Itoa(user.Phone),
+		"dni":         strconv.Itoa(user.Dni),
+		"school":      user.School,
+		"is_verified": strconv.FormatBool(user.IsVerified),
+	})
+
+	if err != nil {
+		http.Error(w, "No se puedo enviar el Token", http.StatusInternalServerError)
+		return
+	}
+
 }
 
 // LoginUser
