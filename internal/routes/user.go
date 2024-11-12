@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -45,19 +46,26 @@ func createLoan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Decodifico el JSON recibido
-	var requestData map[string]interface{}
-	err = json.NewDecoder(r.Body).Decode(&requestData)
+	bodyBytes, err := io.ReadAll(r.Body)
 
 	if err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
-	// Extraigo el itemType del JSON
-	itemType, ok := requestData["itemType"].(int)
-	if !ok {
-		http.Error(w, "Invalid itemType", http.StatusBadRequest)
+	// Decodifico el json en un map para obtener el campo "itemType"
+	var data map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &data); err != nil {
+		http.Error(w, "Error al deserializar en map:", http.StatusBadRequest)
+		return
+	}
+
+	// Variable para guardar "itemType"
+	var itemType int
+	if it, ok := data["itemType"].(float64); ok { // JSON numbers are unmarshalled as float64
+		itemType = int(it)
+	} else {
+		http.Error(w, "Campo 'itemType' no encontrado o no es un int", http.StatusBadRequest)
 		return
 	}
 
