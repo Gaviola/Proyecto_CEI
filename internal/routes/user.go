@@ -22,17 +22,13 @@ import (
 func UserRoutes(r chi.Router) {
 	r.Route("/user", func(r chi.Router) {
 		r.Use(middlewares.AuthMiddleware) // Middleware de verificación de token
-
 		// Rutas para usuarios
-		r.Route("/{userID}", func(r chi.Router) {
-			r.Post("/createLoan", createLoan)   // Crear un préstamo
-			r.Delete("/cancelLoan", cancelLoan) // Cancelar prestamo
-			r.Get("/getLoans", getLoans)        // Obtener préstamos
-			r.Get("/getItems", getItems)        // Obtener ítems
-			r.Patch("/updateUser", updateUser)  // Actualizar datos del usuario
-			r.Get("/getUser", getUser)          // Obtener datos del usuario
-
-		})
+		r.Post("/createLoan", createLoan)   // Crear un préstamo
+		r.Delete("/cancelLoan", cancelLoan) // Cancelar prestamo
+		r.Get("/getLoans", getLoans)        // Obtener préstamos
+		r.Get("/getItems", getItems)        // Obtener ítems
+		r.Patch("/updateUser", updateUser)  // Actualizar datos del usuario
+		r.Get("/getUser", getUser)          // Obtener datos del usuario
 	})
 }
 
@@ -41,43 +37,10 @@ func UserRoutes(r chi.Router) {
 Crea un préstamo de un ítem para el usuario.
 */
 func createLoan(w http.ResponseWriter, r *http.Request) {
-	var jwtKey []byte
-	jwtKey, err := base64.StdEncoding.DecodeString(os.Getenv("JWT_SECRET"))
-	if err != nil {
-		http.Error(w, "Error al decodificar la llave secreta", http.StatusInternalServerError)
-		return
-	}
-
 	// Obtengo el ID del usuario desde el token JWT
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		http.Error(w, "No Authorization header provided", http.StatusUnauthorized)
-		return
-	}
-
-	// Split the header to get the token part
-	tokenString := strings.Split(authHeader, "Bearer ")[1]
-
-	// Parse the token
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// Validate the algorithm
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		// Return the secret key (replace with your actual secret key)
-		return jwtKey, nil
-	})
+	userID, err := getTokenId(r)
 
 	if err != nil {
-		http.Error(w, "Invalid token", http.StatusUnauthorized)
-		return
-	}
-
-	// Extract the user ID from the token claims
-	var userID int
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		userID = claims["ID"].(int)
-	} else {
 		http.Error(w, "Invalid token", http.StatusUnauthorized)
 		return
 	}
@@ -85,6 +48,11 @@ func createLoan(w http.ResponseWriter, r *http.Request) {
 	// Decodifico el JSON recibido
 	var itemType int
 	err = json.NewDecoder(r.Body).Decode(&itemType)
+
+	if err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
 
 	// Verifico que haya al menos un item en la BD con el itemType recibido
 	availableItems, err := repositories.DBShowAvailableItemsByItemType(itemType)
@@ -135,20 +103,21 @@ func createLoan(w http.ResponseWriter, r *http.Request) {
 Cancela un préstamo de un ítem para el usuario.
 */
 func cancelLoan(w http.ResponseWriter, r *http.Request) {
-	idUser := chi.URLParam(r, "userID")
+	idUser, err := getTokenId(r)
+
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
 
 	loan := models.Loan{}
-	err := json.NewDecoder(r.Body).Decode(&loan)
+	err = json.NewDecoder(r.Body).Decode(&loan)
 	if err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
-	loan.UserID, err = strconv.Atoi(idUser)
-	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
-		return
-	}
+	loan.UserID = idUser
 
 	err = repositories.DBDeleteLoan(loan.ID)
 	if err != nil {
@@ -164,9 +133,8 @@ func cancelLoan(w http.ResponseWriter, r *http.Request) {
 Obtiene todos los préstamos del usuario.
 */
 func getLoans(w http.ResponseWriter, r *http.Request) {
-	userID := chi.URLParam(r, "userID")
+	id, err := getTokenId(r)
 
-	id, err := strconv.Atoi(userID)
 	if err != nil {
 		http.Error(w, "Invalid user ID", http.StatusBadRequest)
 		return
@@ -212,15 +180,20 @@ func getItems(w http.ResponseWriter, r *http.Request) {
 Actualiza los datos del usuario. Datos como ID o email no se pueden modificar.
 */
 func updateUser(w http.ResponseWriter, r *http.Request) {
-	userID := chi.URLParam(r, "userID")
+	id, err := getTokenId(r)
+
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+
 	updatedUser := models.User{}
-	err := json.NewDecoder(r.Body).Decode(&updatedUser)
+	err = json.NewDecoder(r.Body).Decode(&updatedUser)
 	if err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
-	id, err := strconv.Atoi(userID)
 	if err != nil {
 		http.Error(w, "Invalid user ID", http.StatusBadRequest)
 		return
@@ -260,5 +233,56 @@ func getUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = json.NewEncoder(w).Encode(user)
+
+	if err != nil {
+		http.Error(w, "Error encoding response", http.StatusInternalServerError)
+		return
+	}
+
+}
+
+// GetTokenId
+/*
+Obtiene el ID del usuario a partir del token JWT.
+*/
+func getTokenId(r *http.Request) (int, error) {
+	var jwtKey []byte
+	jwtKey, err := base64.StdEncoding.DecodeString(os.Getenv("JWT_SECRET"))
+	if err != nil {
+		return 0, err
+	}
+
+	// Obtengo el ID del usuario desde el token JWT
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return 0, fmt.Errorf("No Authorization header provided")
+	}
+
+	// Split the header to get the token part
+	tokenString := strings.Split(authHeader, "Bearer ")[1]
+
+	// Parse the token
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Validate the algorithm
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		// Return the secret key (replace with your actual secret key)
+		return jwtKey, nil
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	// Extract the user ID from the token claims
+	var userID int
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		userID = claims["ID"].(int)
+	} else {
+		return 0, fmt.Errorf("Invalid token")
+	}
+
+	return userID, nil
 
 }
