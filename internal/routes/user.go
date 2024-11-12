@@ -255,19 +255,15 @@ func getTokenId(r *http.Request) (int, error) {
 	// Obtengo el ID del usuario desde el token JWT
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		return 0, fmt.Errorf("No Authorization header provided")
+		return 0, fmt.Errorf("no Authorization header provided")
 	}
 
 	// Split the header to get the token part
 	tokenString := strings.Split(authHeader, "Bearer ")[1]
 
 	// Parse the token
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// Validate the algorithm
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		// Return the secret key (replace with your actual secret key)
+	claims := &models.Claims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		return jwtKey, nil
 	})
 
@@ -275,14 +271,9 @@ func getTokenId(r *http.Request) (int, error) {
 		return 0, err
 	}
 
-	// Extract the user ID from the token claims
-	var userID int
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		userID = claims["ID"].(int)
-	} else {
-		return 0, fmt.Errorf("Invalid token")
+	if !token.Valid {
+		return 0, fmt.Errorf("invalid token")
 	}
 
-	return userID, nil
-
+	return claims.ID, nil
 }
