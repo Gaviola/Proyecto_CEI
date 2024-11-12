@@ -264,15 +264,10 @@ func LoginGoogle(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if err != nil {
-			http.Error(w, "Error creando el usuario", http.StatusInternalServerError)
-			return
-		}
-
 		tokenString, err = CreateSessionToken(newUser, 240)
 
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -294,9 +289,27 @@ func LoginGoogle(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-
 		// Si existe, envio el token
-		err = json.NewEncoder(w).Encode(map[string]string{"tokenJWT": tokenString})
+		tokenString, err = CreateSessionToken(user, 240)
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		err = json.NewEncoder(w).Encode(map[string]string{
+			"tokenJWT":    tokenString,
+			"id":          strconv.Itoa(user.ID),
+			"role":        user.Role,
+			"username":    user.Name,
+			"lastname":    user.Lastname,
+			"email":       user.Email,
+			"student_id":  strconv.Itoa(user.StudentId),
+			"phone":       strconv.Itoa(user.Phone),
+			"dni":         strconv.Itoa(user.Dni),
+			"school":      user.School,
+			"is_verified": strconv.FormatBool(user.IsVerified)})
+
 		if err != nil {
 			http.Error(w, "No se puedo enviar el Token", http.StatusInternalServerError)
 			return
