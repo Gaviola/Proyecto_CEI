@@ -76,7 +76,7 @@ func LoginJWT(w http.ResponseWriter, r *http.Request) {
 
 	//Busco al usuario en la base de datos en funcion del id dentro del token
 	userID := claims.ID
-	if err != nil {
+	if userID == 0 {
 		http.Error(w, "ID de usuario inválido", http.StatusInternalServerError)
 		return
 	}
@@ -291,13 +291,14 @@ func LoginGoogle(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "No se puedo enviar el Token", http.StatusInternalServerError)
 			return
 		}
-	}
+	} else {
 
-	// Si existe, envio el token
-	err = json.NewEncoder(w).Encode(map[string]string{"tokenJWT": tokenString})
-	if err != nil {
-		http.Error(w, "No se puedo enviar el Token", http.StatusInternalServerError)
-		return
+		// Si existe, envio el token
+		err = json.NewEncoder(w).Encode(map[string]string{"tokenJWT": tokenString})
+		if err != nil {
+			http.Error(w, "No se puedo enviar el Token", http.StatusInternalServerError)
+			return
+		}
 	}
 
 }
