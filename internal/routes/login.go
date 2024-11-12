@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/Gaviola/Proyecto_CEI_Back.git/internal/repositories"
-	"github.com/Gaviola/Proyecto_CEI_Back.git/internal/services"
 	"github.com/Gaviola/Proyecto_CEI_Back.git/models"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/go-chi/chi/v5"
@@ -213,84 +212,93 @@ LoginGoogle permite a un usuario autenticarse con Google.
 */
 func LoginGoogle(w http.ResponseWriter, r *http.Request) {
 	// Routes for the application
-	http.HandleFunc("/", services.HandleMain)
-	http.HandleFunc("/login-gl", services.HandleGoogleLogin)
-	http.HandleFunc("/callback-gl", func(w http.ResponseWriter, r *http.Request) {
-		response, err := services.CallBackFromGoogle(w, r)
+	/*
+		http.HandleFunc("/", services.HandleMain)
+		http.HandleFunc("/login-gl", services.HandleGoogleLogin)
+		http.HandleFunc("/callback-gl", func(w http.ResponseWriter, r *http.Request) {
+			response, err := services.CallBackFromGoogle(w, r)
+			if err != nil {
+				http.Error(w, "Error en la autenticación con Google", http.StatusInternalServerError)
+				return
+			}
+
+			// Parse the response from Google
+			var googleUser models.GoogleUser
+			err = json.Unmarshal(response, &googleUser)
+			if err != nil {
+				http.Error(w, "Error en la autenticación con Google", http.StatusInternalServerError)
+				return
+			}
+	*/
+	//Decode the json response that contains the mail
+	var googleUser models.User
+	err := json.NewDecoder(r.Body).Decode(&googleUser)
+	if err != nil {
+		http.Error(w, "Error en la autenticación con Google", http.StatusInternalServerError)
+		return
+	}
+
+	// Check if the user exists in the database
+	var user models.User
+
+	user, err = repositories.DBGetUserByEmail(googleUser.Email)
+
+	if err != nil {
+		http.Error(w, "Error de servidor", http.StatusInternalServerError)
+		return
+	}
+
+	var tokenString string
+	// Si el usuario no existe, lo creo
+	if !(user.IsEmpty()) {
+		newUser := models.User{
+			Name:       googleUser.Email,
+			IsVerified: false,
+		}
+
+		err = repositories.DBSaveUser(newUser)
 		if err != nil {
-			http.Error(w, "Error en la autenticación con Google", http.StatusInternalServerError)
+			http.Error(w, "Error guardando el usuario", http.StatusInternalServerError)
 			return
 		}
 
-		// Parse the response from Google
-		var googleUser models.GoogleUser
-		err = json.Unmarshal(response, &googleUser)
 		if err != nil {
-			http.Error(w, "Error en la autenticación con Google", http.StatusInternalServerError)
+			http.Error(w, "Error creando el usuario", http.StatusInternalServerError)
 			return
 		}
 
-		// Check if the user exists in the database
-		var user models.User
-		user, err = repositories.DBGetUserByEmail(googleUser.Email)
+		tokenString, err = CreateSessionToken(newUser, 240)
 
 		if err != nil {
-			http.Error(w, "Error de servidor", http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
 
-		var tokenString string
-		// Si el usuario no existe, lo creo
-		if !(user.IsEmpty()) {
-			newUser := models.User{
-				Name:       googleUser.Email,
-				IsVerified: false,
-			}
-
-			err = repositories.DBSaveUser(newUser)
-			if err != nil {
-				http.Error(w, "Error guardando el usuario", http.StatusInternalServerError)
-				return
-			}
-
-			if err != nil {
-				http.Error(w, "Error creando el usuario", http.StatusInternalServerError)
-				return
-			}
-
-			tokenString, err = CreateSessionToken(newUser, 240)
-
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusUnauthorized)
-				return
-			}
-
-			// Envio el token del nuevo usuario
-			err = json.NewEncoder(w).Encode(map[string]string{
-				"tokenJWT":    tokenString,
-				"id":          strconv.Itoa(user.ID),
-				"role":        user.Role,
-				"username":    user.Name,
-				"lastname":    user.Lastname,
-				"email":       user.Email,
-				"student_id":  strconv.Itoa(user.StudentId),
-				"phone":       strconv.Itoa(user.Phone),
-				"dni":         strconv.Itoa(user.Dni),
-				"school":      user.School,
-				"is_verified": strconv.FormatBool(user.IsVerified)})
-			if err != nil {
-				http.Error(w, "No se puedo enviar el Token", http.StatusInternalServerError)
-				return
-			}
-		}
-
-		// Si existe, envio el token
-		err = json.NewEncoder(w).Encode(map[string]string{"tokenJWT": tokenString})
+		// Envio el token del nuevo usuario
+		err = json.NewEncoder(w).Encode(map[string]string{
+			"tokenJWT":    tokenString,
+			"id":          strconv.Itoa(user.ID),
+			"role":        user.Role,
+			"username":    user.Name,
+			"lastname":    user.Lastname,
+			"email":       user.Email,
+			"student_id":  strconv.Itoa(user.StudentId),
+			"phone":       strconv.Itoa(user.Phone),
+			"dni":         strconv.Itoa(user.Dni),
+			"school":      user.School,
+			"is_verified": strconv.FormatBool(user.IsVerified)})
 		if err != nil {
 			http.Error(w, "No se puedo enviar el Token", http.StatusInternalServerError)
 			return
 		}
-	})
+	}
+
+	// Si existe, envio el token
+	err = json.NewEncoder(w).Encode(map[string]string{"tokenJWT": tokenString})
+	if err != nil {
+		http.Error(w, "No se puedo enviar el Token", http.StatusInternalServerError)
+		return
+	}
 
 }
 
