@@ -176,6 +176,7 @@ func CreateSessionToken(user models.User, sessionTime int) (string, error) {
 		// Genera un token JWT
 		expirationTime := time.Now().Add(time.Duration(sessionTime) * time.Minute)
 		claims := &models.Claims{
+			ID:       user.ID,
 			Username: user.Name,
 			Role:     user.Role,
 			StandardClaims: jwt.StandardClaims{
