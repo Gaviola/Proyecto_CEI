@@ -46,11 +46,18 @@ func createLoan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Decodifico el JSON recibido
-	var itemType int
-	err = json.NewDecoder(r.Body).Decode(&itemType)
+	var requestData map[string]interface{}
+	err = json.NewDecoder(r.Body).Decode(&requestData)
 
 	if err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// Extraigo el itemType del JSON
+	itemType, ok := requestData["itemType"].(int)
+	if !ok {
+		http.Error(w, "Invalid itemType", http.StatusBadRequest)
 		return
 	}
 
