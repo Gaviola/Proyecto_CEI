@@ -253,7 +253,8 @@ func LoginGoogle(w http.ResponseWriter, r *http.Request) {
 	// Si el usuario no existe, lo creo
 	if !(user.IsEmpty()) {
 		newUser := models.User{
-			Name:       googleUser.Email,
+			Email:      googleUser.Email,
+			Role:       "student",
 			IsVerified: false,
 		}
 
