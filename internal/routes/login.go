@@ -264,6 +264,14 @@ func LoginGoogle(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Busco al usuario recien creado
+		user, err = repositories.DBGetUserByEmail(googleUser.Email)
+
+		if err != nil {
+			http.Error(w, "Error de servidor", http.StatusInternalServerError)
+			return
+		}
+
 		tokenString, err = CreateSessionToken(newUser, 240)
 
 		if err != nil {
