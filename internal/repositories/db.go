@@ -505,11 +505,11 @@ func DBShowAvailableItemsByItemType(itemType int) ([]models.Item, error) {
 			fmt.Println(err)
 		}
 	}(db)
-	query := `select i.id, t."name", i.typeid, i.code, i.price from item i
-				join typeitem t on i.id = t.id
-				join loanitem l on i.id = l.itemid
-				join loan l2 on l.loanid = l2.id
-				where l2.status <> 'Active' and i.typeid = $1
+	query := `select i.id, t."name", i.typeid, i.code, i.price from item i 
+				join typeitem t on i.typeid = t.id
+				left join loanitem l on i.id = l.itemid
+				left join loan l2 on l.loanid = l2.id
+				where (l2.status <> 'Active' or l2.status is null) and i.typeid = $1
 				limit 1;`
 
 	rows, err := db.Query(query, itemType)

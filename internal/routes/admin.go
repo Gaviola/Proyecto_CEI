@@ -652,6 +652,18 @@ func CreateLoan(w http.ResponseWriter, r *http.Request) {
 	loanID, err = repositories.DBSaveLoan(loan)
 
 	if err != nil {
+		return
+	}
+
+	// Return ID of first available item
+	loanItem := models.LoanItem{
+		LoanID: int(loanID),
+		ItemID: availableItems[0].ID,
+	}
+
+	err = repositories.DBSaveLoanItem(loanItem)
+
+	if err != nil {
 		fmt.Println(err)
 		return
 	}

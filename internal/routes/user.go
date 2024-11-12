@@ -168,7 +168,7 @@ Obtiene todos los ítems disponibles para prestar a un usuario.
 func getItems(w http.ResponseWriter, r *http.Request) {
 	var items []models.Item
 
-	items, err := repositories.DBGetAvailableItems()
+	items, err := repositories.DBShowAvailableItems()
 	if err != nil {
 		http.Error(w, "Error getting items", http.StatusInternalServerError)
 		return
