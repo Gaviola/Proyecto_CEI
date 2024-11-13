@@ -272,7 +272,7 @@ func LoginGoogle(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		tokenString, err = CreateSessionToken(newUser, 240)
+		tokenString, err = CreateSessionToken(user, 240)
 
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
