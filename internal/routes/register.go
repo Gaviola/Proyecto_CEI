@@ -72,8 +72,16 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var userFound models.User
+	userFound, err = repositories.DBGetUserByEmail(userRegister.Email)
+
+	if err != nil {
+		http.Error(w, "Error de servidor", http.StatusInternalServerError)
+		return
+	}
+
 	// Creo el token JWT
-	tokenString, err := CreateSessionToken(userRegister, 240)
+	tokenString, err := CreateSessionToken(userFound, 240)
 	if err != nil {
 		http.Error(w, "Error creating token", http.StatusInternalServerError)
 		return
@@ -82,7 +90,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	err = json.NewEncoder(w).Encode(map[string]string{
 		"tokenJWT":    tokenString,
-		"id":          strconv.Itoa(userRegister.ID),
+		"id":          strconv.Itoa(userFound.ID),
 		"role":        userRegister.Role,
 		"username":    userRegister.Name,
 		"lastname":    userRegister.Lastname,
