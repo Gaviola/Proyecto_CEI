@@ -105,6 +105,19 @@ func createLoan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Return ID of first available item
+	loanItem := models.LoanItem{
+		LoanID: int(loanID),
+		ItemID: availableItems[0].ID,
+	}
+
+	err = repositories.DBSaveLoanItem(loanItem)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
 	// Enviar id del prestamo creado
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(map[string]int64{"loanID": loanID})
