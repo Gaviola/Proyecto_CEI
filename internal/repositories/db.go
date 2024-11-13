@@ -424,11 +424,15 @@ func DBShowAvailableItems() ([]models.Item, error) {
 			fmt.Println(err)
 		}
 	}(db)
-	query := `select i.id, t."name", i.typeid, i.code, i.price from item i 
-				join typeitem t on i.typeid = t.id
-				left join loanitem l on i.id = l.itemid
-				left join loan l2 on l.loanid = l2.id
-				where l2.status <> 'Active' or l2.status is null`
+	query := `select i.id, t."name", i.typeid, i.code, i.price
+from item i 
+join typeitem t on i.typeid = t.id
+where not exists (
+    select 1 
+    from loanitem li 
+    join loan l on li.loanid = l.id 
+    where li.itemid = i.id and l.status = 'Active'
+);`
 
 	rows, err := db.Query(query)
 	if err != nil {
@@ -464,12 +468,17 @@ func DBShowAvailableItemsByItemTypeID(itemTypeID int) ([]models.Item, error) {
 			fmt.Println(err)
 		}
 	}(db)
-	query := `select i.id, t."name", i.typeid, i.code, i.price from item i 
-				join typeitem t on i.typeid = t.id
-				left join loanitem l on i.id = l.itemid
-				left join loan l2 on l.loanid = l2.id
-				where (l2.status <> 'Active' or l2.status is null) and i.typeid = $1
-				limit 1;`
+	query := `select i.id, t."name", i.typeid, i.code, i.price
+from item i 
+join typeitem t on i.typeid = t.id
+where i.typeid = $1
+and not exists (
+    select 1 
+    from loanitem li 
+    join loan l on li.loanid = l.id 
+    where li.itemid = i.id and l.status = 'Active'
+)
+limit 1;`
 
 	rows, err := db.Query(query, itemTypeID)
 	if err != nil {
@@ -505,12 +514,17 @@ func DBShowAvailableItemsByItemType(itemType int) ([]models.Item, error) {
 			fmt.Println(err)
 		}
 	}(db)
-	query := `select i.id, t."name", i.typeid, i.code, i.price from item i 
-				join typeitem t on i.typeid = t.id
-				left join loanitem l on i.id = l.itemid
-				left join loan l2 on l.loanid = l2.id
-				where (l2.status <> 'Active' or l2.status is null) and i.typeid = $1
-				limit 1;`
+	query := `select i.id, t."name", i.typeid, i.code, i.price
+from item i 
+join typeitem t on i.typeid = t.id
+where i.typeid = $1
+and not exists (
+    select 1 
+    from loanitem li 
+    join loan l on li.loanid = l.id 
+    where li.itemid = i.id and l.status = 'Active'
+)
+limit 1;`
 
 	rows, err := db.Query(query, itemType)
 	if err != nil {
@@ -670,7 +684,7 @@ func DBDeleteItemType(id int) error {
 			fmt.Println()
 		}
 	}(db)
-	query := "DELETE FROM typeitem WHERE id = $1"
+	query := "DELETE FROM typeitem WHERE id = $1;"
 	_, err := db.Exec(query, id)
 	if err != nil {
 		return err
@@ -731,6 +745,46 @@ func DBShowLoans() ([]models.Loan, error) {
 		err := rows.Scan(&loan.ID, &loan.Status, &loan.UserID, &loan.AdminID, &loan.CreationDate, &loan.EndingDate, &loan.ReturnDate, &loan.Observation, &loan.Price, &loan.PaymentMethod)
 		if err != nil {
 			fmt.Println(err)
+			return nil, err
+		}
+		loans = append(loans, loan)
+	}
+
+	return loans, nil
+}
+
+// DBShowLoansWithItemType
+/*
+Devuelve una lista con los prestamos que hay en la base de datos en formato JSON
+junto al tipo de item que se presto.
+*/
+func DBShowLoansWithItemType() ([]models.LoanWithItemType, error) {
+
+	var loans []models.LoanWithItemType
+
+	db := connect(false)
+	// Cerrar la conexion a la base de datos
+	defer func(db *sql.DB) {
+		err := db.Close()
+		if err != nil {
+			fmt.Println()
+		}
+	}(db)
+	query := `select l.*, t."name" from loan l 
+				join loanitem l2 on l.id = l2.loanid
+				join item i on i.id = l2.itemid 
+				join typeitem t on t.id = i.typeid;
+				`
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var loan models.LoanWithItemType
+		err := rows.Scan(&loan.ID, &loan.Status, &loan.UserID, &loan.AdminID, &loan.CreationDate, &loan.EndingDate, &loan.ReturnDate, &loan.Observation, &loan.Price, &loan.PaymentMethod, &loan.ItemType)
+		if err != nil {
 			return nil, err
 		}
 		loans = append(loans, loan)

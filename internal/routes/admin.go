@@ -61,6 +61,7 @@ func AdminRoutes(r chi.Router) {
 			r.Delete("/{loanID}", DeleteLoan) // Eliminar un préstamo
 			r.Patch("/{loanID}", UpdateLoan)  // Actualizar un préstamo
 			r.Get("/", GetLoans)              // Obtener todos los préstamos
+			r.Get("/withItemType", GetLoansWithItemType)
 			r.Get("/{loanID}", GetLoan)       // Obtener un préstamo
 		})
 
@@ -743,6 +744,27 @@ Obtiene todos los prestamos de la base de datos
 func GetLoans(w http.ResponseWriter, r *http.Request) {
 
 	loans, err := repositories.DBShowLoans()
+
+	if err != nil {
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(loans)
+
+	if err != nil {
+		return
+	}
+
+}
+
+// GetLoansWithItemType
+/*
+Obtiene todos los prestamos de la base de datos con el tipo de item
+*/
+func GetLoansWithItemType(w http.ResponseWriter, r *http.Request) {
+	
+	loans, err := repositories.DBShowLoansWithItemType()
 
 	if err != nil {
 		return

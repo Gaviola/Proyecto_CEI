@@ -28,6 +28,7 @@ func UserRoutes(r chi.Router) {
 		r.Delete("/cancelLoan", cancelLoan) // Cancelar prestamo
 		r.Get("/getLoans", getLoans)        // Obtener préstamos
 		r.Get("/getItems", getItems)        // Obtener ítems
+		r.Get("/getItemTypes", getItemTypes) // Obtener tipos de ítems
 		r.Patch("/updateUser", updateUser)  // Actualizar datos del usuario
 		r.Get("/getUser", getUser)          // Obtener datos del usuario
 	})
@@ -183,6 +184,27 @@ func getItems(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = json.NewEncoder(w).Encode(items)
+	if err != nil {
+		http.Error(w, "Error encoding response", http.StatusInternalServerError)
+		return
+	}
+
+}
+
+// GetItemTypes
+/*
+Obtiene todos los tipos de ítems que hay prestar a un usuario.
+*/
+func getItemTypes(w http.ResponseWriter, r *http.Request) {
+	var itemTypes []models.ItemType
+
+	itemTypes, err := repositories.DBShowItemTypes()
+	if err != nil {
+		http.Error(w, "Error getting item types", http.StatusInternalServerError)
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(itemTypes)
 	if err != nil {
 		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 		return
